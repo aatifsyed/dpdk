@@ -1,6 +1,8 @@
-[package]
-name = "dpdk"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = ["rust/*"]
+resolver = "2"
 
-[dependencies]
+[workspace.package]
+publish = false
+edition = "2021"
+version = "0.0.0"
