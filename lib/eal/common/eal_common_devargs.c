@@ -64,9 +64,11 @@ rte_devargs_layers_parse(struct rte_devargs *devargs,
 		{ RTE_DEVARGS_KEY_CLASS "=",  NULL, NULL, },
 		{ RTE_DEVARGS_KEY_DRIVER "=", NULL, NULL, },
 	};
-	struct rte_kvargs_pair *kv = NULL;
 	struct rte_kvargs *bus_kvlist = NULL;
 	char *s;
+	const char *bus = NULL;
+	const char *cls = NULL;
+	const char *drv = NULL;
 	size_t nblayer = 0;
 	size_t i;
 	int ret = 0;
@@ -125,32 +127,32 @@ rte_devargs_layers_parse(struct rte_devargs *devargs,
 	for (i = 0; i < RTE_DIM(layers); i++) {
 		if (layers[i].kvlist == NULL)
 			continue;
-		kv = &layers[i].kvlist->pairs[0];
-		if (kv->key == NULL)
-			continue;
-		if (strcmp(kv->key, RTE_DEVARGS_KEY_BUS) == 0) {
+		bus = rte_kvargs_get(layers[i].kvlist, RTE_DEVARGS_KEY_BUS);
+		if (bus != NULL) {
 			bus_kvlist = layers[i].kvlist;
 			devargs->bus_str = layers[i].str;
-			devargs->bus = rte_bus_find_by_name(kv->value);
+			devargs->bus = rte_bus_find_by_name(bus);
 			if (devargs->bus == NULL) {
 				EAL_LOG(ERR, "Could not find bus \"%s\"",
-					kv->value);
+					bus);
 				ret = -EFAULT;
 				goto get_out;
 			}
-		} else if (strcmp(kv->key, RTE_DEVARGS_KEY_CLASS) == 0) {
+		}
+		cls = rte_kvargs_get(layers[i].kvlist, RTE_DEVARGS_KEY_CLASS);
+		if (cls != NULL) {
 			devargs->cls_str = layers[i].str;
-			devargs->cls = rte_class_find_by_name(kv->value);
+			devargs->cls = rte_class_find_by_name(cls);
 			if (devargs->cls == NULL) {
 				EAL_LOG(ERR, "Could not find class \"%s\"",
-					kv->value);
+					cls);
 				ret = -EFAULT;
 				goto get_out;
 			}
-		} else if (strcmp(kv->key, RTE_DEVARGS_KEY_DRIVER) == 0) {
-			devargs->drv_str = layers[i].str;
-			continue;
 		}
+		drv = rte_kvargs_get(layers[i].kvlist, RTE_DEVARGS_KEY_DRIVER);
+		if (drv != NULL)
+			devargs->drv_str = layers[i].str;
 	}
 
 	/* Resolve devargs name. */

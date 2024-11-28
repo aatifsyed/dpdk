@@ -118,7 +118,6 @@ eth_dev_match(const struct rte_eth_dev *edev,
 	int ret;
 	const struct eth_dev_match_arg *arg = _arg;
 	const struct rte_kvargs *kvlist = arg->kvlist;
-	unsigned int pair;
 
 	if (edev->state == RTE_ETH_DEV_UNUSED)
 		return -1;
@@ -136,13 +135,11 @@ eth_dev_match(const struct rte_eth_dev *edev,
 			eth_representor_cmp, (void *)(uintptr_t)edev);
 	if (ret != 0)
 		return -1;
+
 	/* search for representor key */
-	for (pair = 0; pair < kvlist->count; pair++) {
-		ret = strcmp(kvlist->pairs[pair].key,
-				eth_params_keys[RTE_ETH_PARAM_REPRESENTOR]);
-		if (ret == 0)
-			break; /* there is a representor key */
-	}
+	if (rte_kvargs_get(kvlist, eth_params_keys[RTE_ETH_PARAM_REPRESENTOR]) == NULL)
+		ret = 0; /* there is a representor key */
+
 	/* if no representor key, default is to not match representor ports */
 	if (ret != 0)
 		if (rte_eth_dev_is_repr(edev))
