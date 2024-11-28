@@ -5,3 +5,6 @@ name = "kvargs"
 
 [lib]
 path = "lib.rs"
+
+[dependencies]
+nom = "7.1.3"
