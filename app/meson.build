@@ -130,3 +130,10 @@ foreach app:apps
         subdir('test/suites')  # define the pre-canned test suites
     endif
 endforeach
+
+executable(
+    'test_hello_rust',
+    sources: ['test_hello_rust/main.rs'],
+    link_with: [hello_rust],
+    rust_args: ['--edition=2021']
+)

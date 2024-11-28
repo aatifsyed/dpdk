@@ -331,3 +331,5 @@ foreach l:libraries
         message('lib/@0@: Defining dependency "@1@"'.format(l, name))
     endif
 endforeach
+
+hello_rust = library('hello_rust', sources: ['hello_rust/lib.rs'], rust_args: ['--edition=2021'])

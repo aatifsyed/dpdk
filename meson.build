@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright(c) 2017-2019 Intel Corporation
 
-project('DPDK', 'c',
+project('DPDK', 'c', 'rust',
         version: files('VERSION'),
         license: 'BSD',
         default_options: [
@@ -10,7 +10,7 @@ project('DPDK', 'c',
             'default_library=static',
             'warning_level=2',
         ],
-        meson_version: '>= 0.57'
+        meson_version: '>= 1.6.0'
 )
 
 # check for developer mode
