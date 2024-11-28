@@ -333,3 +333,4 @@ foreach l:libraries
 endforeach
 
 hello_rust = library('hello_rust', sources: ['hello_rust/lib.rs'], rust_args: ['--edition=2021'])
+hello_rust_c = library('hello_rust_c', sources: ['hello_rust/lib.rs'], rust_args: ['--edition=2021'], rust_abi: 'c')
