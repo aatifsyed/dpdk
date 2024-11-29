@@ -1,0 +1,12 @@
+[package]
+name = "third-party-rust"
+description = "empty library purely for `cargo vendor`-ing"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+seestr = "0.1.4"
+
+[lib]
+path = "/dev/null"
