@@ -6,7 +6,9 @@ edition = "2021"
 publish = false
 
 [dependencies]
+nom = "7.1.3"
 seestr = "0.1.4"
+trybox = "0.1.1"
 
 [lib]
 path = "/dev/null"
