@@ -140,7 +140,7 @@ executable(
 executable(
     'test_hello_rust_from_c',
     sources: ['test_hello_rust/main.c'],
-    link_with: [hello_rust_c],
+    link_with: [hello_rust_c, kvargs],
     c_args: default_cflags,
     include_directories: global_inc, # we get -include rte_config.h passed to us
 )

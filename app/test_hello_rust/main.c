@@ -1,30 +1,38 @@
 #include <stddef.h>
 #include <stdio.h>
+#include <../lib/kvargs/rte_kvargs.h>
+#include <assert.h>
 
-size_t len(const char *);
-char *concat(const char *, const char *);
-void free_buf(char *);
+int print_each_arg(const char *key, const char *val, void *opaque)
+{
+    int rc;
+    if (val != NULL)
+        rc = printf("%s => %s\n", key, val);
+    else
+        rc = printf("%s\n", key);
+    if (rc == EOF)
+        return -1;
+    return 0;
+}
 
 int main(int argc, const char **argv)
 {
-    size_t my_len = len("hello");
-    if (printf("%ld\n", my_len) == EOF)
+    for (int i = 0; i < argc; i++)
     {
-        return 1;
-    }
-    char *hello_world = concat("hello", "world");
-    if (hello_world != NULL)
-    {
-        if (printf("%s\n", hello_world) == EOF)
+        if (i == 0)
+            continue;
+        struct rte_kvargs *kvlist = rte_kvargs_parse(argv[i], NULL);
+        if (kvlist == NULL)
         {
-            free_buf(hello_world);
+            printf("failed to parse %s\n", argv[i]);
             return 1;
         }
-        free_buf(hello_world);
+        else
+        {
+            rte_kvargs_process_opt(kvlist, NULL, print_each_arg, NULL);
+            rte_kvargs_free(kvlist);
+        }
     }
-    else
-    {
-        printf("failed to concat\n");
-    }
+
     return 0;
 }
