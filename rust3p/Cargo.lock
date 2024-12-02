@@ -31,21 +31,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "rust3p"
+version = "0.0.0"
+dependencies = [
+ "nom",
+ "seasick",
+ "trybox",
+]
+
+[[package]]
 name = "seasick"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "567364672fe707341525041972feadfbb65d359b05c44bedd0da721cc5231cc9"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "third-party-rust"
-version = "0.0.0"
-dependencies = [
- "nom",
- "seasick",
- "trybox",
 ]
 
 [[package]]

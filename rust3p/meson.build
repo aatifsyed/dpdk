@@ -1,6 +1,6 @@
-rust_trybox = library(
+rust3p_trybox = library(
     'trybox',
-    sources: ['/home/aatif/code/dpdk/third-party-rust/.vendor/trybox/src/lib.rs'],
+    sources: ['vendor/trybox/src/lib.rs'],
     rust_args: [
         '--edition=2021',
         '--cfg', 'feature="default"',
@@ -8,18 +8,18 @@ rust_trybox = library(
     ],
 )
 
-rust_minimal_lexical = library(
+rust3p_minimal_lexical = library(
     'minimal_lexical',
-    sources: ['/home/aatif/code/dpdk/third-party-rust/.vendor/minimal-lexical/src/lib.rs'],
+    sources: ['vendor/minimal-lexical/src/lib.rs'],
     rust_args: [
         '--edition=2018',
         '--cfg', 'feature="std"',
     ],
 )
 
-rust_memchr = library(
+rust3p_memchr = library(
     'memchr',
-    sources: ['/home/aatif/code/dpdk/third-party-rust/.vendor/memchr/src/lib.rs'],
+    sources: ['vendor/memchr/src/lib.rs'],
     rust_args: [
         '--edition=2021',
         '--cfg', 'feature="alloc"',
@@ -27,9 +27,9 @@ rust_memchr = library(
     ],
 )
 
-rust_nom = library(
+rust3p_nom = library(
     'nom',
-    sources: ['/home/aatif/code/dpdk/third-party-rust/.vendor/nom/src/lib.rs'],
+    sources: ['vendor/nom/src/lib.rs'],
     rust_args: [
         '--edition=2018',
         '--cfg', 'feature="alloc"',
@@ -37,24 +37,24 @@ rust_nom = library(
         '--cfg', 'feature="std"',
     ],
     link_with: [
-        rust_minimal_lexical,
-        rust_memchr,
+        rust3p_minimal_lexical,
+        rust3p_memchr,
     ],
 )
 
-rust_libc = library(
+rust3p_libc = library(
     'libc',
     # ignoring build script
-    sources: ['/home/aatif/code/dpdk/third-party-rust/.vendor/libc/src/lib.rs'],
+    sources: ['vendor/libc/src/lib.rs'],
     rust_args: [
         '--edition=2015',
         '--cfg', 'feature="std"',
     ],
 )
 
-rust_seasick = library(
+rust3p_seasick = library(
     'seasick',
-    sources: ['/home/aatif/code/dpdk/third-party-rust/.vendor/seasick/src/lib.rs'],
+    sources: ['vendor/seasick/src/lib.rs'],
     rust_args: [
         '--edition=2021',
         '--cfg', 'feature="alloc"',
@@ -63,20 +63,20 @@ rust_seasick = library(
         '--cfg', 'feature="std"',
     ],
     link_with: [
-        rust_libc,
+        rust3p_libc,
     ],
 )
 
-rust_third_party_rust = library(
-    'third_party_rust',
-    sources: ['/dev/null'],
+rust3p_rust3p = library(
+    'rust3p',
+    sources: ['empty.rs'],
     rust_args: [
         '--edition=2021',
     ],
     link_with: [
-        rust_trybox,
-        rust_seasick,
-        rust_nom,
+        rust3p_trybox,
+        rust3p_seasick,
+        rust3p_nom,
     ],
 )
 

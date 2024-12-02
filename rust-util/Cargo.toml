@@ -13,3 +13,6 @@ petgraph = "0.6.5"
 serde = { version = "1.0.215", features = ["derive"] }
 serde_ignored = "0.1.10"
 serde_json = "1.0.133"
+
+[lib]
+path = "lib.rs"

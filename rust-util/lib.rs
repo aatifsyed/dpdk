@@ -14,9 +14,12 @@ use serde::Deserialize;
 
 #[test]
 fn third_party_meson_build() {
+    let rust3p_dir = Utf8Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../rust3p/"))
+        .canonicalize_utf8()
+        .unwrap();
     let cmd = Command::new(env!("CARGO"))
         .args(["build"])
-        .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../third-party-rust/"))
+        .current_dir(&rust3p_dir)
         .args(["-Zunstable-options", "--unit-graph"])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -99,6 +102,7 @@ fn third_party_meson_build() {
         };
         let mut link_with = vec![];
         let mut has_build_script = false;
+        let source = source.strip_prefix(&rust3p_dir).unwrap();
 
         for edge in graph.edges_directed(ix, Direction::Incoming) {
             let E { extern_crate_name } = edge.weight();
@@ -126,7 +130,7 @@ fn third_party_meson_build() {
         writeln!(acc, "{el}").unwrap();
         acc
     });
-    expect_test::expect_file!["../../third-party-rust/meson.build"].assert_eq(&expected);
+    expect_test::expect_file![rust3p_dir.join("meson.build")].assert_eq(&expected);
 }
 
 struct Invocation<'a> {

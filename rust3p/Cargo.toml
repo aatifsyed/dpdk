@@ -1,5 +1,5 @@
 [package]
-name = "third-party-rust"
+name = "rust3p"
 description = "empty library purely for `cargo vendor`-ing"
 version = "0.0.0"
 edition = "2021"
@@ -11,4 +11,4 @@ seasick = "0.1.0"
 trybox = "0.1.2"
 
 [lib]
-path = "/dev/null"
+path = "empty.rs"

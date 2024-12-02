@@ -336,19 +336,19 @@ hello_rust = library(
     'hello_rust',
     sources: ['hello_rust/lib.rs'],
     rust_args: ['--edition=2021'],
-    link_with: [seasick],
+    link_with: [rust3p_seasick]
 )
 hello_rust_c = library(
     'hello_rust_c',
     sources: ['hello_rust/lib.rs'],
     rust_args: ['--edition=2021'],
     rust_abi: 'c',
-    link_with: [seasick],
+    link_with: [rust3p_seasick],
 )
 kvargs = library(
     'kvargs',
     sources: ['kvargs/lib.rs'],
     rust_args: ['--edition=2021'],
     rust_abi: 'c',
-    link_with: [nom, trybox, seasick],
+    link_with: [rust3p_nom, rust3p_trybox, rust3p_seasick ],
 )

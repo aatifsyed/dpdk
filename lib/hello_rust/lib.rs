@@ -1,5 +1,3 @@
-use std::ffi::{c_char, CStr};
-
 use seasick::{SeaStr, SeaString};
 
 #[no_mangle]

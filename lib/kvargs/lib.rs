@@ -8,10 +8,6 @@ use seasick::{SeaStr, SeaString};
 
 use crate::util::Base;
 
-pub const RTE_KVARGS_MAX: u32 = 32;
-pub const RTE_KVARGS_PAIRS_DELIM: &[u8; 2] = b",\0";
-pub const RTE_KVARGS_KV_DELIM: &[u8; 2] = b"=\0";
-
 /// Callback prototype used by rte_kvargs_process().
 ///
 ///  @param key

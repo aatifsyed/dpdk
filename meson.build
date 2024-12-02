@@ -78,7 +78,7 @@ if is_linux
     global_inc += include_directories('kernel/linux')
 endif
 
-subdir('third-party-rust')
+subdir('rust3p')
 
 # build libs and drivers
 subdir('lib')
