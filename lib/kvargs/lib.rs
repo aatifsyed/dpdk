@@ -4,7 +4,7 @@ use core::{
 };
 use std::{mem::MaybeUninit, ptr::NonNull};
 
-use seestr::{Buf, NulTerminated};
+use seasick::{SeaStr, SeaString};
 
 use crate::util::Base;
 
@@ -24,26 +24,23 @@ pub const RTE_KVARGS_KV_DELIM: &[u8; 2] = b"=\0";
 ///    - >=0 handle key success.
 ///    - <0 on error.
 #[allow(non_camel_case_types)]
-pub type arg_handler_t = unsafe extern "C" fn(
-    key: &NulTerminated,
-    value: Option<&NulTerminated>,
-    opaque: *mut c_void,
-) -> c_int;
+pub type arg_handler_t =
+    unsafe extern "C" fn(key: &SeaStr, value: Option<&SeaStr>, opaque: *mut c_void) -> c_int;
 /// A key/value association
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct rte_kvargs_pair {
     /// < the name (key) of the association
-    pub key: NonNull<NulTerminated>,
+    pub key: NonNull<SeaStr>,
     /// < the value associated to that key
-    pub value: Option<NonNull<NulTerminated>>,
+    pub value: Option<NonNull<SeaStr>>,
 }
 /// Store a list of key/value associations
 #[repr(C)]
 #[derive(Debug)]
 pub struct rte_kvargs {
     /// < copy of the argument string
-    pub str_: Option<Buf>,
+    pub str_: Option<SeaString>,
     /// < number of entries in the list
     pub count: c_uint,
     /// < list of key/values
@@ -68,8 +65,8 @@ pub struct rte_kvargs {
 ///    - NULL on error
 #[no_mangle]
 pub extern "C" fn rte_kvargs_parse(
-    parse_me: &NulTerminated,
-    valid_keys: Option<Base<&NulTerminated>>,
+    parse_me: &SeaStr,
+    valid_keys: Option<Base<&SeaStr>>,
 ) -> Option<Box<rte_kvargs>> {
     let mut fail = false;
     let mut args = trybox::or_drop(rte_kvargs {
@@ -82,43 +79,38 @@ pub extern "C" fn rte_kvargs_parse(
         return Some(args);
     }
     let mut save = args.pairs.iter_mut().inspect(|_| args.count += 1);
-    let buf = Buf::try_with(parse_me.len_with_nul(), |mut buf| {
+    let buf = SeaString::try_with(parse_me.len_with_nul(), |mut buf| {
+        macro_rules! bail {
+            () => {{
+                fail = true;
+                return;
+            }};
+        }
         let parsed = parsing::for_each(parse_me.bytes(), |k, v| {
             if fail {
                 return;
             }
             use std::io::Write as _;
-            let Some(dst) = save.next() else {
-                fail = true;
-                return; // too many args
-            };
+            let Some(dst) = save.next() else { bail!() };
             let mut src = rte_kvargs_pair {
                 key: NonNull::from(&buf[0]).cast(),
                 value: None,
             };
-            let Ok(()) = buf.write_all(k) else {
-                fail = true;
-                return;
-            };
+            let Ok(()) = buf.write_all(k) else { bail!() };
             let Ok(()) = buf.write_all(b"\0") else {
-                fail = true;
-                return;
+                bail!()
             };
             if let Some(v) = v {
                 src.value = Some(NonNull::from(&buf[0]).cast());
-                let Ok(()) = buf.write_all(v) else {
-                    fail = true;
-                    return;
-                };
+                let Ok(()) = buf.write_all(v) else { bail!() };
                 let Ok(()) = buf.write_all(b"\0") else {
-                    fail = true;
-                    return;
+                    bail!()
                 };
             }
             dst.write(src);
         });
         if parsed.is_err() {
-            fail = true
+            bail!()
         }
     })
     .ok()?;
@@ -163,9 +155,9 @@ pub extern "C" fn rte_kvargs_parse(
 ///    - NULL on error
 #[no_mangle]
 pub extern "C" fn rte_kvargs_parse_delim(
-    args: &NulTerminated,
-    valid_keys: Option<Base<&NulTerminated>>,
-    valid_ends: Option<&NulTerminated>,
+    args: &SeaStr,
+    valid_keys: Option<Base<&SeaStr>>,
+    valid_ends: Option<&SeaStr>,
 ) -> Option<Box<rte_kvargs>> {
     let _todo = (args, valid_keys, valid_ends);
     None
@@ -199,8 +191,8 @@ pub extern "C" fn rte_kvargs_free(_: Option<Box<rte_kvargs>>) {}
 #[no_mangle]
 pub unsafe extern "C" fn rte_kvargs_get<'a>(
     kvlist: &'a rte_kvargs,
-    key: &NulTerminated,
-) -> Option<&'a NulTerminated> {
+    key: &SeaStr,
+) -> Option<&'a SeaStr> {
     iter(kvlist).find_map(|(k, v)| match k == key {
         true => v,
         false => None,
@@ -209,9 +201,7 @@ pub unsafe extern "C" fn rte_kvargs_get<'a>(
 
 /// # Safety
 /// - must have been allocated by [`rte_kvargs_parse`], and not modified.
-unsafe fn iter(
-    kvlist: &rte_kvargs,
-) -> impl Iterator<Item = (&NulTerminated, Option<&NulTerminated>)> {
+unsafe fn iter(kvlist: &rte_kvargs) -> impl Iterator<Item = (&SeaStr, Option<&SeaStr>)> {
     kvlist.pairs.iter().take(kvlist.count as usize).map(|it| {
         let rte_kvargs_pair { key, value } = it.assume_init_ref();
         (key.as_ref(), value.map(|it| it.as_ref()))
@@ -239,9 +229,9 @@ unsafe fn iter(
 #[no_mangle]
 pub unsafe extern "C" fn rte_kvargs_get_with_value<'a>(
     kvlist: &'a rte_kvargs,
-    key: Option<&NulTerminated>,
-    value: Option<&NulTerminated>,
-) -> Option<&'a NulTerminated> {
+    key: Option<&SeaStr>,
+    value: Option<&SeaStr>,
+) -> Option<&'a SeaStr> {
     let _todo = (kvlist, key, value);
     None
 }
@@ -271,7 +261,7 @@ pub unsafe extern "C" fn rte_kvargs_get_with_value<'a>(
 #[no_mangle]
 pub unsafe extern "C" fn rte_kvargs_process(
     kvlist: &rte_kvargs,
-    key_match: Option<&NulTerminated>,
+    key_match: Option<&SeaStr>,
     handler: arg_handler_t,
     opaque_arg: *mut c_void,
 ) -> c_int {
@@ -314,7 +304,7 @@ pub unsafe extern "C" fn rte_kvargs_process(
 #[no_mangle]
 pub unsafe extern "C" fn rte_kvargs_process_opt(
     kvlist: &rte_kvargs,
-    key_match: Option<&NulTerminated>,
+    key_match: Option<&SeaStr>,
     handler: arg_handler_t,
     opaque_arg: *mut c_void,
 ) -> c_int {
@@ -344,7 +334,7 @@ pub unsafe extern "C" fn rte_kvargs_process_opt(
 #[no_mangle]
 pub unsafe extern "C" fn rte_kvargs_count(
     kvlist: &rte_kvargs,
-    key_match: Option<&NulTerminated>,
+    key_match: Option<&SeaStr>,
 ) -> c_uint {
     let mut ct = 0;
     for (key, _) in iter(kvlist) {

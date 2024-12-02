@@ -1,5 +1,5 @@
-use hello_rust::len;
+use hello_rust::hello_rust_len;
 
 fn main() {
-    dbg!(unsafe { len(c"hello".as_ptr()) });
+    dbg!(unsafe { hello_rust_len(Some(c"hello".into())) });
 }

@@ -1,21 +1,16 @@
 use std::ffi::{c_char, CStr};
 
-use seestr::{Buf, NulTerminated};
+use seasick::{SeaStr, SeaString};
 
-/// # Safety
-/// - If non-null, `ptr` must point to a nul-terminated string.
 #[no_mangle]
-pub unsafe extern "C" fn len(ptr: *const c_char) -> usize {
-    match ptr.is_null() {
-        true => 0,
-        false => CStr::from_ptr(ptr).to_bytes().len(),
-    }
+pub unsafe extern "C" fn hello_rust_len(ptr: Option<&SeaStr>) -> usize {
+    ptr.map(SeaStr::len).unwrap_or_default()
 }
 
 #[no_mangle]
-pub extern "C" fn concat(left: &NulTerminated, right: &NulTerminated) -> Option<Buf> {
-    Buf::try_with(left.len() + right.len(), |buf| {
-        let (left_dst, right_dst) = buf.split_at_mut(left.len());
+pub extern "C" fn hello_rust_concat(left: &SeaStr, right: &SeaStr) -> Option<SeaString> {
+    SeaString::try_with(left.len().checked_add(right.len())?, |initme| {
+        let (left_dst, right_dst) = initme.split_at_mut(left.len());
         left_dst.copy_from_slice(left);
         right_dst.copy_from_slice(right);
     })
@@ -23,4 +18,4 @@ pub extern "C" fn concat(left: &NulTerminated, right: &NulTerminated) -> Option<
 }
 
 #[no_mangle]
-pub extern "C" fn free_buf(_: Option<Buf>) {}
+pub extern "C" fn hello_rust_free(_: Option<SeaString>) {}

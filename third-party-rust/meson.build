@@ -27,17 +27,9 @@ nom = library(
     ],
     link_with: [memchr, minimal_lexical],
 )
-number_prefix = library(
-    'number_prefix',
-    sources: ['.vendor/number_prefix/src/lib.rs'],
-    # meson bug: using '--cfg=feature="..."' gives us a malformed rust-project.json
-    rust_args: [
-        '--cfg', 'feature="std"',
-    ],
-)
-seestr = library(
-    'seestr',
-    sources: ['.vendor/seestr/src/lib.rs'],
+seasick = library(
+    'seasick',
+    sources: ['.vendor/seasick/src/lib.rs'],
     rust_args: [
         '--edition=2021',
         '--cfg', 'feature="libc"',
@@ -53,5 +45,4 @@ trybox = library(
         '--edition=2021',
         '--cfg', 'feature="std"',
     ],
-    link_with: [number_prefix],
 )
