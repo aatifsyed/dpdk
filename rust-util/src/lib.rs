@@ -149,7 +149,7 @@ impl fmt::Display for Invocation<'_> {
             has_build_script,
         } = self;
 
-        writeln!(f, "rust_{name} = library(")?;
+        writeln!(f, "rust3p_{name} = library(")?;
         writeln!(f, "    '{name}',")?;
         if *has_build_script {
             writeln!(f, "    # ignoring build script")?;
@@ -164,9 +164,9 @@ impl fmt::Display for Invocation<'_> {
         if !link_with.is_empty() {
             writeln!(f, "    link_with: [")?;
             for link in link_with {
-                writeln!(f, "        rust_{link},")?;
+                writeln!(f, "        rust3p_{link},")?;
             }
-            writeln!(f, "    ],")?;
+            writeln!(f, "    ],")?; // link_with
         }
         writeln!(f, ")")?;
         Ok(())
