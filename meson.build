@@ -124,7 +124,7 @@ bindgen = rust.bindgen(
     input: 'bindgen.h',
     output: 'bindgen.rs',
     include_directories: [global_inc, dpdk_includes],
-    c_args: ['-fretain-comments-from-system-headers']
+    c_args: ['-fretain-comments-from-system-headers'],
 )
 bindings = static_library(
     'bindings',
