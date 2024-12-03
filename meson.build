@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright(c) 2017-2019 Intel Corporation
 
-project('DPDK', 'c',
+project('DPDK', 'c', 'rust',
         version: files('VERSION'),
         license: 'BSD',
         default_options: [
@@ -10,7 +10,7 @@ project('DPDK', 'c',
             'default_library=static',
             'warning_level=2',
         ],
-        meson_version: '>= 0.57'
+        meson_version: '>= 1.6.0'
 )
 
 # check for developer mode
@@ -64,17 +64,21 @@ endif
 # configure the build, and make sure configs here and in config folder are
 # able to be included in any file. We also store a global array of include dirs
 # for passing to pmdinfogen scripts
-global_inc = [include_directories('.', 'config',
+global_inc_raw = [
+    '.',
+    'config',
     'lib/eal/include',
     'lib/eal/@0@/include'.format(host_machine.system()),
     'lib/eal/@0@/include'.format(arch_subdir),
-)]
+]
+global_inc = [include_directories(global_inc_raw)]
 
 # do configuration and get tool paths
 subdir('buildtools')
 subdir('config')
 
 if is_linux
+    global_inc_raw += 'kernel/linux'
     global_inc += include_directories('kernel/linux')
 endif
 
@@ -106,7 +110,7 @@ endif
 
 # write the build config
 build_cfg = 'rte_build_config.h'
-configure_file(output: build_cfg,
+rte_build_config = configure_file(output: build_cfg,
         configuration: dpdk_conf,
         install_dir: join_paths(get_option('includedir'),
             get_option('include_subdir_arch')))
@@ -117,6 +121,27 @@ subdir('buildtools/pkg-config')
 if meson.is_subproject()
     subdir('buildtools/subproject')
 endif
+
+
+bindgen = find_program('bindgen', dirs: meson.current_source_dir())
+bindings_rs = custom_target(
+    'bind',
+    command: [bindgen, '@INPUT@', '--use-core', '--', '-fretain-comments-from-system-headers'],
+    input: global_inc_raw,
+    output: 'bindings.rs',
+    capture: true,
+)
+bindings = static_library(
+    'bindings',
+    bindings_rs,
+    rust_args: [
+        '--edition=2021',
+        '-Anon_camel_case_types',
+        '-Anon_upper_case_globals'
+    ],
+)
+
+subdir('rust')
 
 # Final output, list all the parts to be built.
 # This does not affect any part of the build, for information only.
