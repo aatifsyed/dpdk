@@ -1,0 +1,21 @@
+#!/usr/bin/env dotslash
+{
+    "name": "bindgen",
+    "platforms": {
+        "linux-x86_64": {
+            "providers": [
+                {
+                    "type": "github-release",
+                    "repo": "rust-lang/rust-bindgen",
+                    "tag": "v0.70.1",
+                    "name": "bindgen-cli-x86_64-unknown-linux-gnu.tar.xz"
+                }
+            ],
+            "format": "tar.xz",
+            "path": "bindgen-cli-x86_64-unknown-linux-gnu/bindgen",
+            "size": 1968336,
+            "hash": "sha256",
+            "digest": "7a926cb9ad9fe222fa6248f9e6fac4bd17d5098e54fbad4d7b38e3251d03a704"
+        }
+    }
+}
