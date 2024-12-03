@@ -213,7 +213,7 @@ jobs:
         isa-l-devel jansson-devel libarchive-devel libatomic libbsd-devel
         libbpf-devel libfdt-devel libpcap-devel libvirt-devel libxdp-devel
         ninja-build numactl-devel openssl-devel python3-pip python3-pyelftools
-        python3-setuptools python3-wheel rdma-core-devel zlib-devel
+        python3-setuptools python3-wheel rdma-core-devel rust zlib-devel
     - name: Save image in cache
       if: steps.image_cache.outputs.cache-hit != 'true'
       run: |
@@ -288,7 +288,7 @@ jobs:
         isa-l-devel jansson-devel libarchive-devel libatomic libbsd-devel
         libbpf-devel libfdt-devel libpcap-devel libvirt-devel libxdp-devel
         ninja-build numactl-devel openssl-devel python3-pip python3-pyelftools
-        python3-setuptools python3-wheel rdma-core-devel zlib-devel
+        python3-setuptools python3-wheel rdma-core-devel rust zlib-devel
         ${{ matrix.config.compiler }}
     - name: Run setup
       run: docker exec -i dpdk .ci/linux-setup.sh
