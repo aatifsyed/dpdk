@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright(c) 2017-2019 Intel Corporation
 
-project('DPDK', 'c',
+project('DPDK', 'c', 'rust',
         version: files('VERSION'),
         license: 'BSD',
         default_options: [
@@ -10,7 +10,7 @@ project('DPDK', 'c',
             'default_library=static',
             'warning_level=2',
         ],
-        meson_version: '>= 0.57'
+        meson_version: '>= 1.0.0'
 )
 
 # check for developer mode
@@ -117,6 +117,41 @@ subdir('buildtools/pkg-config')
 if meson.is_subproject()
     subdir('buildtools/subproject')
 endif
+
+rust_edition = '--edition=2021'
+rust = import('rust')
+bindgen = rust.bindgen(
+    input: 'bindgen.h',
+    output: 'bindgen.rs',
+    include_directories: [global_inc, dpdk_includes],
+    c_args: ['-fretain-comments-from-system-headers']
+)
+bindings = static_library(
+    'bindings',
+    bindgen, # NOTE: we don't current bind rte_build_config.h
+    rust_args: [
+        '--allow=non_camel_case_types',
+        '--allow=non_snake_case',
+        '--allow=non_upper_case_globals',
+        rust_edition,
+    ],
+)
+rust_tests = ['kvargs']
+foreach file_stem : rust_tests
+    test(
+        file_stem,
+        executable(
+            'rust-tests-' + file_stem,
+            structured_sources('rust-tests/' + file_stem + '.rs'),
+            link_with: [
+                bindings,
+                dpdk_static_libraries
+            ],
+            rust_args: [rust_edition],
+        ),
+        suite: 'rust-tests'
+    )
+endforeach
 
 # Final output, list all the parts to be built.
 # This does not affect any part of the build, for information only.
