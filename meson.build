@@ -128,7 +128,7 @@ bindgen = rust.bindgen(
 )
 bindings = static_library(
     'bindings',
-    bindgen, # NOTE: we don't current bind rte_build_config.h
+    bindgen, # NOTE: we don't currently bind rte_build_config.h
     rust_args: [
         '--allow=non_camel_case_types',
         '--allow=non_snake_case',
