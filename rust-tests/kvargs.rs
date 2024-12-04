@@ -6,19 +6,72 @@ use std::{
 use bindings::*;
 
 fn main() {
-    test_kvargs(c"hello", None, Some(vec![(c"hello", None)]));
-    test_kvargs(c"hello=world", None, Some(vec![(c"hello", Some(c"world"))]));
-    test_kvargs(c"hello=[world]", None, Some(vec![(c"hello", Some(c"[world]"))]));
-    test_kvargs(c"hello=[world],hello", None, Some(vec![(c"hello", Some(c"[world]")), (c"hello", None)]));
-    test_kvargs(c"hello,notallowed", Some(&[c"hello"]), None);
+    pass(c"simple", &[(c"simple", None)]);
+    pass(c"key=value", &[(c"key", Some(c"value"))]);
+    pass(
+        c"key=value,simple",
+        &[(c"key", Some(c"value")), (c"simple", None)],
+    );
+    pass(
+        c"simple,key=value",
+        &[(c"simple", None), (c"key", Some(c"value"))],
+    );
+    pass(c"simple,simple", &[(c"simple", None), (c"simple", None)]);
+    pass(
+        c"key=value1,key=value2",
+        &[(c"key", Some(c"value1")), (c"key", Some(c"value2"))],
+    );
+
+    parse(c"hello", None, Some(vec![(c"hello", None)]));
+    parse(c"hello=world", None, Some(vec![(c"hello", Some(c"world"))]));
+    parse(
+        c"hello=[world]",
+        None,
+        Some(vec![(c"hello", Some(c"[world]"))]),
+    );
+    parse(
+        c"hello=[world],hello",
+        None,
+        Some(vec![(c"hello", Some(c"[world]")), (c"hello", None)]),
+    );
+    parse(c"hello,notallowed", Some(&[c"hello"]), None);
 }
 
 #[track_caller]
-fn test_kvargs(
-    input: &CStr,
-    valid_keys: Option<&[&CStr]>,
-    expected: Option<Vec<(&CStr, Option<&CStr>)>>,
-) {
+fn pass(input: &CStr, expected: &[(&CStr, Option<&CStr>)]) {
+    assert_eq!(
+        parse(input, None),
+        Some(
+            expected
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.map(Into::into)))
+                .collect::<Vec<_>>()
+        )
+    )
+}
+#[track_caller]
+fn pass_with_keys(input: &CStr, keys: &[&CStr], expected: &[(&CStr, Option<&CStr>)]) {
+    assert_eq!(
+        parse(input, Some(keys)),
+        Some(
+            expected
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.map(Into::into)))
+                .collect::<Vec<_>>()
+        )
+    )
+}
+#[track_caller]
+fn fail(input: &CStr) {
+    assert_eq!(parse(input, None), None);
+}
+#[track_caller]
+fn fail_with_keys(input: &CStr, keys: &[&CStr]) {
+    assert_eq!(parse(input, Some(keys)), None);
+}
+
+/// Safe rust wrapper aroung [`rte_kvargs_parse`].
+fn parse(input: &CStr, valid_keys: Option<&[&CStr]>) -> Option<Vec<(CString, Option<CString>)>> {
     let mut _valid_keys = vec![];
     let valid_keys = match valid_keys {
         Some(it) => {
@@ -27,12 +80,12 @@ fn test_kvargs(
         }
         None => ptr::null(),
     };
-    let mut _actual = vec![];
-    let actual = unsafe {
-        let ptr = bindings::rte_kvargs_parse(input.as_ptr(), valid_keys);
+    unsafe {
+        let ptr = rte_kvargs_parse(input.as_ptr(), valid_keys);
         match ptr.is_null() {
             true => None,
             false => {
+                let mut actual = vec![];
                 unsafe extern "C" fn process(
                     key: *const c_char,
                     value: *const c_char,
@@ -49,20 +102,23 @@ fn test_kvargs(
                     0
                 }
                 let mut f = |key: &CStr, value: Option<&CStr>| {
-                    _actual.push((CString::from(key), value.map(CString::from)));
+                    actual.push((CString::from(key), value.map(CString::from)));
                 };
                 let mut f = &mut f as &mut dyn FnMut(&CStr, Option<&CStr>);
                 let f = &mut f as *mut _ as *mut c_void; // fat -> thin -> opaque
                 rte_kvargs_process_opt(ptr, ptr::null(), Some(process), f);
                 rte_kvargs_free(ptr);
-                Some(
-                    _actual
-                        .iter()
-                        .map(|(k, v)| (k.as_c_str(), v.as_ref().map(CString::as_c_str)))
-                        .collect::<Vec<_>>(),
-                )
+                Some(actual)
             }
         }
-    };
-    assert_eq!(actual, expected);
+    }
+}
+
+/// # Safety
+/// - `theirs` must be returned from [`rte_kvargs_parse`], and alive.
+unsafe fn sanity_check(ours: &[(CString, Option<CString>)], theirs: *const rte_kvargs) {
+    assert_eq!(ours.len(), rte_kvargs_count(theirs, ptr::null()) as usize);
+    for (key, _) in ours {
+        assert!(rte_kvargs_count(theirs, key.as_ptr()) > 1);
+    }
 }
