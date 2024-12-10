@@ -50,10 +50,21 @@ static struct vdev_custom_scans vdev_custom_scans =
 	TAILQ_HEAD_INITIALIZER(vdev_custom_scans);
 static rte_spinlock_t vdev_custom_scan_lock = RTE_SPINLOCK_INITIALIZER;
 
+
+unsigned int rte_vdev_count(void) {
+	unsigned int count = 0;
+	struct rte_vdev_driver *it;
+	RTE_TAILQ_FOREACH(it, &vdev_driver_list, next){
+		count++;
+	};
+	return count;
+}
+
 /* register a driver */
 void
 rte_vdev_register(struct rte_vdev_driver *driver)
 {
+	printf("registering driver %s\n", driver->driver.name);
 	TAILQ_INSERT_TAIL(&vdev_driver_list, driver, next);
 }
 

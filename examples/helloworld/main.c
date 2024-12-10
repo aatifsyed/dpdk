@@ -33,6 +33,8 @@ main(int argc, char **argv)
 	int ret;
 	unsigned lcore_id;
 
+	printf("main\n");
+
 	ret = rte_eal_init(argc, argv);
 	if (ret < 0)
 		rte_panic("Cannot init EAL\n");

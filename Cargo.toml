@@ -1,0 +1,14 @@
+[package]
+name = "dpdk"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "dpdk"
+path = "main.rs"
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.70.1"
+cc = "1.2.2"

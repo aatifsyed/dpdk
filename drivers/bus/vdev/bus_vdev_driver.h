@@ -131,6 +131,8 @@ void rte_vdev_register(struct rte_vdev_driver *driver);
 __rte_internal
 void rte_vdev_unregister(struct rte_vdev_driver *driver);
 
+unsigned int rte_vdev_count(void);
+
 #define RTE_PMD_REGISTER_VDEV(nm, vdrv)\
 static const char *vdrvinit_ ## nm ## _alias;\
 RTE_INIT(vdrvinitfn_ ##vdrv)\
