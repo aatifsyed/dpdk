@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "seesaw"
-version = "0.1.5"
+version = "0.1.6"
 authors = ["Aatif Syed <0xaatif@gmail.com>"]
 build = false
 include = [
