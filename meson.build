@@ -10,7 +10,7 @@ project('DPDK', 'c', 'rust',
             'default_library=static',
             'warning_level=2',
         ],
-        meson_version: '>= 1.0.0'
+        meson_version: '>= 1.3.0'
 )
 
 # check for developer mode
@@ -136,6 +136,35 @@ bindings = static_library(
         rust_edition,
     ],
 )
+
+# all third-party rust libraries live here.
+unit2name = {'1': 'libc', '21': 'rust3p'}
+subdir('rust3p')
+rust3p = unit21
+
+generate_seesaw = executable(
+    'generate_seesaw',
+    sources: structured_sources('lib/generate_seesaw.rs'),
+    rust_args: [rust_edition],
+    link_with: [rust3p]
+)
+
+seesaw_rs = custom_target(
+    'seesaw_rs',
+    command: [generate_seesaw],
+    input: [bindgen],
+    output: ['seesaw.rs'],
+    capture: true,
+    feed: true,
+)
+
+seesaw = static_library(
+    'seesaw',
+    sources:[seesaw_rs],
+    rust_args: [rust_edition],
+    link_with: [bindings],
+)
+
 rust_tests = ['kvargs']
 foreach file_stem : rust_tests
     test(
