@@ -116,9 +116,9 @@ dependencies = [
 
 [[package]]
 name = "seesaw"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbeccaad6d500f98bf1842b24f75c3b4adba1494b5b1e9202fe80320d4d373f3"
+checksum = "f157f2c721ee08575f27cbe28ba757e75bcb3cceb504e98882ebff4149c48fd4"
 dependencies = [
  "prettyplease",
  "proc-macro2",
