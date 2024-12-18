@@ -146,11 +146,11 @@ generate_seesaw = executable(
     'generate_seesaw',
     sources: structured_sources('lib/generate_seesaw.rs'),
     rust_args: [rust_edition],
-    link_with: [rust3p]
+    link_with: [rust3p],
 )
 
-seesaw_rs = custom_target(
-    'seesaw_rs',
+seesaw_compileme = custom_target(
+    'seesaw_compileme',
     command: [generate_seesaw],
     input: [bindgen],
     output: ['seesaw.rs'],
@@ -158,11 +158,18 @@ seesaw_rs = custom_target(
     feed: true,
 )
 
-seesaw = static_library(
-    'seesaw',
-    sources:[seesaw_rs],
+seesaw_dpdk = static_library(
+    'seesaw_dpdk',
+    sources:[seesaw_compileme],
     rust_args: [rust_edition],
     link_with: [bindings],
+)
+
+library(
+    'rte_kvargs_rs',
+    sources: structured_sources('lib/kvargs/rte_kvargs.rs'),
+    rust_args: [rust_edition],
+    link_with: [seesaw_dpdk, rust3p, bindings],
 )
 
 rust_tests = ['kvargs']
