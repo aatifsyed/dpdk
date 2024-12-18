@@ -12,9 +12,10 @@
 [package]
 edition = "2021"
 name = "seasick"
-version = "0.1.0"
+version = "0.1.2"
 authors = ["Aatif Syed <0xaatif@gmail.com>"]
 build = false
+autolib = false
 autobins = false
 autoexamples = false
 autotests = false

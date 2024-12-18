@@ -50,3 +50,5 @@ pub use _alloc::*;
 pub use _box::*;
 pub use _str::*;
 pub use _string::*;
+
+pub mod nul_terminated;

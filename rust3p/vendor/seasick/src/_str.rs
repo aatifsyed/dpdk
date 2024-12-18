@@ -202,7 +202,7 @@ impl<'a> From<&'a CStr> for &'a SeaStr {
     }
 }
 
-impl<'a> Default for &'a SeaStr {
+impl Default for &'_ SeaStr {
     fn default() -> Self {
         SeaStr::from_cstr(c"")
     }
