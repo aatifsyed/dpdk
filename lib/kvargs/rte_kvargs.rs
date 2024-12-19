@@ -1,21 +1,17 @@
 use std::{
     cmp,
-    ffi::CStr,
-    io,
-    mem::{self, MaybeUninit},
-    ops::RangeFrom,
+    mem::MaybeUninit,
     os::raw::{c_char, c_int, c_uint, c_void},
-    pin::Pin,
     ptr::{self, NonNull},
 };
 
 use bindings::*;
 use rust3p::{
-    seasick::{Allocator, Libc, SeaBox, SeaBoxIn, SeaStr, SeaString},
+    seasick::{nul_terminated, SeaBox, SeaStr, SeaString},
     seesaw::no_mangle as no_mangle_all,
 };
 
-struct Impl;
+pub struct Impl;
 
 #[no_mangle_all]
 impl seesaw_dpdk::KVargs for Impl {
@@ -23,7 +19,16 @@ impl seesaw_dpdk::KVargs for Impl {
         args: *const c_char,
         valid_keys: *const *const c_char,
     ) -> *mut rte_kvargs {
-        todo!()
+        let Some(args) = maybe::c_str(args) else {
+            return ptr::null_mut();
+        };
+        new_with_allowlist(
+            args.to_bytes(),
+            maybe::iter(valid_keys as *const *const SeaStr),
+        )
+        .map(SeaBox::into_raw)
+        .unwrap_or(ptr::null_mut())
+        .cast()
     }
 
     unsafe extern "C" fn rte_kvargs_parse_delim(
@@ -31,18 +36,42 @@ impl seesaw_dpdk::KVargs for Impl {
         valid_keys: *const *const c_char,
         valid_ends: *const c_char,
     ) -> *mut rte_kvargs {
-        todo!()
+        let Some(valid_ends) = maybe::c_str(valid_ends) else {
+            return Self::rte_kvargs_parse(args, valid_keys);
+        };
+        let Some(args) = maybe::c_str(args) else {
+            return ptr::null_mut();
+        };
+        let args = match args
+            .to_bytes()
+            .iter()
+            .position(|it| valid_ends.to_bytes().contains(it))
+        {
+            Some(ix) => &args.to_bytes()[..ix],
+            None => args.to_bytes(),
+        };
+        new_with_allowlist(args, maybe::iter(valid_keys as *const *const SeaStr))
+            .map(SeaBox::into_raw)
+            .unwrap_or(ptr::null_mut())
+            .cast()
     }
 
     unsafe extern "C" fn rte_kvargs_free(kvlist: *mut rte_kvargs) {
-        todo!()
+        drop(maybe::seabox(kvlist as *mut KVargs))
     }
 
     unsafe extern "C" fn rte_kvargs_get(
         kvlist: *const rte_kvargs,
         key: *const c_char,
     ) -> *const c_char {
-        todo!()
+        if let Some(kvlist) = kvlist.cast::<KVargs>().as_ref() {
+            if let Some(needle) = maybe::c_str(key) {
+                if let Some((_, Some(found))) = kvlist.iter().find(|(k, _)| k.as_cstr() == needle) {
+                    return found.as_ptr();
+                }
+            }
+        }
+        ptr::null()
     }
 
     unsafe extern "C" fn rte_kvargs_get_with_value(
@@ -50,7 +79,26 @@ impl seesaw_dpdk::KVargs for Impl {
         key: *const c_char,
         value: *const c_char,
     ) -> *const c_char {
-        todo!()
+        if let Some(kvlist) = kvlist.cast::<KVargs>().as_ref() {
+            let key = maybe::c_str(key);
+            let value = maybe::c_str(value);
+            for (k, v) in kvlist.iter() {
+                if let Some(key) = key {
+                    if key != k.as_cstr() {
+                        continue;
+                    }
+                }
+                if let (Some(value), Some(v)) = (value, v) {
+                    if value != v.as_cstr() {
+                        continue;
+                    }
+                }
+                if let Some(v) = v {
+                    return v.as_ptr();
+                }
+            }
+        }
+        ptr::null()
     }
 
     unsafe extern "C" fn rte_kvargs_process(
@@ -59,7 +107,7 @@ impl seesaw_dpdk::KVargs for Impl {
         handler: arg_handler_t,
         opaque_arg: *mut c_void,
     ) -> c_int {
-        todo!()
+        process(kvlist, key_match, handler, opaque_arg, false)
     }
 
     unsafe extern "C" fn rte_kvargs_process_opt(
@@ -68,15 +116,83 @@ impl seesaw_dpdk::KVargs for Impl {
         handler: arg_handler_t,
         opaque_arg: *mut c_void,
     ) -> c_int {
-        todo!()
+        process(kvlist, key_match, handler, opaque_arg, true)
     }
 
     unsafe extern "C" fn rte_kvargs_count(
         kvlist: *const rte_kvargs,
         key_match: *const c_char,
     ) -> c_uint {
-        todo!()
+        let mut count = 0;
+        let needle = maybe::c_str(key_match);
+        if let Some(kvlist) = kvlist.cast::<KVargs>().as_ref() {
+            for (k, _) in kvlist.iter() {
+                let inc = match needle {
+                    Some(it) => it == k.as_cstr(),
+                    None => true,
+                };
+                if inc {
+                    count += 1
+                }
+            }
+        }
+        count
     }
+}
+
+fn new_with_allowlist(
+    s: &[u8],
+    allowlist: Option<nul_terminated::Iter<SeaStr>>,
+) -> Option<SeaBox<KVargs>> {
+    let kvlist = SeaBox::try_new(KVargs::new(s)?).ok()?;
+    if let Some(allowlist) = allowlist {
+        for (checkme, _) in kvlist.iter() {
+            if !allowlist.clone().into_iter().any(|allow| checkme != allow) {
+                return None;
+            }
+        }
+    }
+    Some(kvlist)
+}
+
+unsafe fn process(
+    kvlist: *const rte_kvargs,
+    key_match: *const c_char,
+    handler: arg_handler_t,
+    opaque_arg: *mut c_void,
+    allow_missing_value: bool,
+) -> c_int {
+    let needle = maybe::c_str(key_match);
+    let (Some(kvlist), Some(cb)) = (kvlist.cast::<KVargs>().as_ref(), handler) else {
+        return -1;
+    };
+    for (k, v) in kvlist.iter() {
+        let call = match needle {
+            Some(it) => it == k.as_cstr(),
+            None => true,
+        };
+        if call {
+            let rc = match allow_missing_value {
+                true => {
+                    let Some(v) = v else { return -1 };
+                    cb(k.as_ptr(), v.as_ptr(), opaque_arg)
+                }
+                false => cb(
+                    k.as_ptr(),
+                    match v {
+                        Some(it) => it.as_ptr(),
+                        None => ptr::null(),
+                    },
+                    opaque_arg,
+                ),
+            };
+
+            if rc < 0 {
+                return rc;
+            }
+        }
+    }
+    0
 }
 
 /// ABI-compatible with [`rte_kvargs`].
@@ -98,7 +214,7 @@ struct Pair {
 }
 
 impl KVargs {
-    fn new(s: &CStr) -> Option<Self> {
+    fn new(mut s: &[u8]) -> Option<Self> {
         let mut pairs = [const { MaybeUninit::zeroed() }; 32];
         let mut count = 0;
         if s.is_empty() {
@@ -108,10 +224,9 @@ impl KVargs {
                 pairs,
             });
         }
-        let mut buf = SeaString::try_with(s.to_bytes_with_nul().len(), |it| it.fill(1)).ok()?;
+        let mut buf = SeaString::try_with(s.len().checked_add(1)?, |_| {}).ok()?;
         let mut iter_pairs = pairs.iter_mut().inspect(|_| count += 1);
         {
-            let mut s = s.to_bytes();
             let buf = &mut **buf;
             let occ = &mut 0;
             let mut parse = |s: &mut &[u8]| {
@@ -217,24 +332,41 @@ fn bare<'a>(input: &'a [u8]) -> ParseResult<'a> {
     )(input)
 }
 
-fn callback_separated<I, O, E, SepO, ParseP, SepP>(
-    mut parser: ParseP,
-    mut separator: SepP,
-    mut fold: impl FnMut(O),
-) -> impl FnMut(I) -> IResult<I, (), E>
-where
-    ParseP: Parser<I, O, E>,
-    SepP: Parser<I, SepO, E>,
-    I: Clone,
-{
-    move |input: I| -> IResult<I, (), E> {
-        let (mut input, first) = parser.parse(input)?;
-        fold(first);
-        while let Ok((after_sep, _sep)) = separator.parse(input.clone()) {
-            let (next_input, item) = parser.parse(after_sep)?;
-            fold(item);
-            input = next_input;
+mod maybe {
+    use std::{
+        ffi::{c_char, CStr},
+        ptr::NonNull,
+    };
+
+    use rust3p::seasick::{nul_terminated::Iter, SeaBox};
+
+    pub unsafe fn c_str<'a>(ptr: *const c_char) -> Option<&'a CStr> {
+        match ptr.is_null() {
+            true => None,
+            false => Some(CStr::from_ptr(ptr)),
         }
-        Ok((input, ()))
     }
+    pub unsafe fn iter<'a, T>(base: *const *const T) -> Option<Iter<'a, T>> {
+        match NonNull::new(base.cast_mut()) {
+            Some(base) => Some(Iter::new(base)),
+            None => None,
+        }
+    }
+    pub unsafe fn seabox<T>(ptr: *mut T) -> Option<SeaBox<T>> {
+        match ptr.is_null() {
+            true => None,
+            false => Some(SeaBox::from_raw(ptr)),
+        }
+    }
+}
+
+#[test]
+fn test() {
+    assert!(KVargs::new(b"hello=world,goodbye").unwrap().iter().eq([
+        (
+            SeaStr::from_cstr(c"hello"),
+            Some(SeaStr::from_cstr(c"world")),
+        ),
+        (SeaStr::from_cstr(c"goodbye"), None),
+    ]));
 }

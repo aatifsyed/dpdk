@@ -165,11 +165,18 @@ seesaw_dpdk = static_library(
     link_with: [bindings],
 )
 
-library(
+rte_kvargs_rs = library(
     'rte_kvargs_rs',
     sources: structured_sources('lib/kvargs/rte_kvargs.rs'),
     rust_args: [rust_edition],
     link_with: [seesaw_dpdk, rust3p, bindings],
+    rust_abi: 'c',
+)
+
+rust.test(
+    'rte_kvargs_rs_test',
+    rte_kvargs_rs,
+    suite: 'rust-tests'
 )
 
 rust_tests = ['kvargs']
