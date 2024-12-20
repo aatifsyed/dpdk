@@ -39,7 +39,7 @@ unsafe impl Allocator for Libc {
     }
 }
 
-/// Returned from [`BufIn::try_of_bytes`].
+/// Heap allocation failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct AllocError(pub usize);
 

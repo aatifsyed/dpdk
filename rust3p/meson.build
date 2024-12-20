@@ -195,7 +195,7 @@ unit25 = library(
     },
 )
 
-# libc 0.2.168 (registry+https://github.com/rust-lang/crates.io-index)
+# libc 0.2.169 (registry+https://github.com/rust-lang/crates.io-index)
 # (had build script)
 unit1 = library(
     unit2name.get('1', 'unit1'), # libc
@@ -207,7 +207,7 @@ unit1 = library(
     ],
 )
 
-# seasick 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)
+# seasick 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)
 unit22 = library(
     unit2name.get('22', 'unit22'), # seasick
     sources: structured_sources('vendor/seasick/src/lib.rs'),

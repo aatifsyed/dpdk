@@ -170,7 +170,7 @@ impl<A: Allocator> fmt::Display for SeaStringIn<A> {
 }
 impl<A1: Allocator, A2: Allocator> PartialEq<SeaStringIn<A2>> for SeaStringIn<A1> {
     fn eq(&self, other: &SeaStringIn<A2>) -> bool {
-        SeaStr::eq(self, other)
+        self.as_cstr() == other.as_cstr()
     }
 }
 impl<A: Allocator> Eq for SeaStringIn<A> {}

@@ -143,6 +143,11 @@ impl PartialEq for SeaStr {
         self.bytes() == other.bytes()
     }
 }
+impl PartialEq<CStr> for SeaStr {
+    fn eq(&self, other: &CStr) -> bool {
+        self.as_cstr() == other
+    }
+}
 impl Eq for SeaStr {}
 impl Hash for SeaStr {
     fn hash<H: Hasher>(&self, state: &mut H) {
