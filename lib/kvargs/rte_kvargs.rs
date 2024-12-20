@@ -195,6 +195,59 @@ unsafe fn process(
     0
 }
 
+macro_rules! assert_eq_layout {
+    ($(
+        // use :path instead of :ty because it is valid in pattern position
+        // (for exhaustiveness check)
+        $left_ty:path = /* can't use `==` here */ $right_ty:path {
+            $($left_field:ident = $right_field:ident),* $(,)?
+        }
+    )*) => {$(
+        const _: () = {
+            use ::core::{{alloc::Layout, mem::offset_of}, concat, stringify, assert};
+
+            // very happy with this :)
+            const fn field_layout<T, U>(_: fn(&U) -> &T) -> Layout {
+                Layout::new::<T>()
+            }
+
+            let left = Layout::new::<$left_ty>();
+            let right = Layout::new::<$right_ty>();
+
+            assert! {
+                left.size() == right.size(),
+                concat!("size mismatch between ", stringify!($left_ty), " and ", stringify!($right_ty))
+            };
+            assert! {
+                left.align() == right.align(),
+                concat!("aligment mismatch between ", stringify!($left_ty), " and ", stringify!($right_ty))
+            };
+
+            $(
+                assert! {
+                    offset_of!($left_ty, $left_field) == offset_of!($right_ty, $right_field),
+                    concat!("mismatched offsets between ", stringify!($left_field), " and ", stringify!($right_field))
+                };
+
+                let left = field_layout(|it: &$left_ty| &it.$left_field);
+                let right = field_layout(|it: &$right_ty| &it.$right_field);
+
+                assert! {
+                    left.size() == right.size(),
+                    concat!("size mismatch between ", stringify!($left_field), " and ", stringify!($right_field))
+                };
+                assert! {
+                    left.align() == right.align(),
+                    concat!("aligment mismatch between ", stringify!($left_field), " and ", stringify!($right_field))
+                };
+            )*
+
+
+            fn exhaustive($left_ty { $($left_field: _),* }: $left_ty, $right_ty { $($right_field: _),* }: $right_ty) {}
+        };
+    )*};
+}
+
 /// ABI-compatible with [`rte_kvargs`].
 #[repr(C)]
 struct KVargs {
@@ -211,6 +264,18 @@ struct KVargs {
 struct Pair {
     key: NonNull<SeaStr>,
     value: Option<NonNull<SeaStr>>,
+}
+
+assert_eq_layout! {
+    KVargs = rte_kvargs {
+        buf = str_,
+        count = count,
+        pairs = pairs,
+    }
+    Pair = rte_kvargs_pair {
+        key = key,
+        value = value,
+    }
 }
 
 impl KVargs {
