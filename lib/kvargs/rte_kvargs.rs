@@ -1,148 +1,133 @@
 use std::{
     cmp,
     mem::MaybeUninit,
-    os::raw::{c_char, c_int, c_uint, c_void},
+    num::Saturating,
+    os::raw::{c_int, c_uint, c_void},
     ptr::{self, NonNull},
 };
 
 use bindings::*;
-use rust3p::{
-    seasick::{nul_terminated, SeaBox, SeaStr, SeaString},
-    seesaw::no_mangle as no_mangle_all,
-};
+use rust3p::seasick::{assert_abi, till_null, SeaBox, SeaStr, SeaString};
 
-pub struct Impl;
+assert_abi!(fn bindings::rte_kvargs_parse = rte_kvargs_parse as unsafe extern "C" fn(_, _) -> _);
+#[no_mangle]
+pub extern "C" fn rte_kvargs_parse(
+    args: Option<&SeaStr>,
+    valid_keys: Option<till_null::Iter<SeaStr>>,
+) -> Option<SeaBox<KVargs>> {
+    new_with_allowlist(args?.bytes(), valid_keys)
+}
 
-#[no_mangle_all]
-impl seesaw_dpdk::KVargs for Impl {
-    unsafe extern "C" fn rte_kvargs_parse(
-        args: *const c_char,
-        valid_keys: *const *const c_char,
-    ) -> *mut rte_kvargs {
-        let Some(args) = maybe::c_str(args) else {
-            return ptr::null_mut();
-        };
-        new_with_allowlist(
-            args.to_bytes(),
-            maybe::iter(valid_keys as *const *const SeaStr),
-        )
-        .map(SeaBox::into_raw)
-        .unwrap_or(ptr::null_mut())
-        .cast()
-    }
+assert_abi!(fn bindings::rte_kvargs_parse_delim = rte_kvargs_parse_delim as unsafe extern "C" fn(_, _, _) -> _);
+#[no_mangle]
+extern "C" fn rte_kvargs_parse_delim(
+    args: Option<&SeaStr>,
+    valid_keys: Option<till_null::Iter<SeaStr>>,
+    valid_ends: Option<&SeaStr>,
+) -> Option<SeaBox<KVargs>> {
+    let Some(trim_to) = valid_ends else {
+        return rte_kvargs_parse(args, valid_keys);
+    };
+    let args: &[u8] = args?.bytes();
 
-    unsafe extern "C" fn rte_kvargs_parse_delim(
-        args: *const c_char,
-        valid_keys: *const *const c_char,
-        valid_ends: *const c_char,
-    ) -> *mut rte_kvargs {
-        let Some(valid_ends) = maybe::c_str(valid_ends) else {
-            return Self::rte_kvargs_parse(args, valid_keys);
-        };
-        let Some(args) = maybe::c_str(args) else {
-            return ptr::null_mut();
-        };
-        let args = match args
-            .to_bytes()
-            .iter()
-            .position(|it| valid_ends.to_bytes().contains(it))
-        {
-            Some(ix) => &args.to_bytes()[..ix],
-            None => args.to_bytes(),
-        };
-        new_with_allowlist(args, maybe::iter(valid_keys as *const *const SeaStr))
-            .map(SeaBox::into_raw)
-            .unwrap_or(ptr::null_mut())
-            .cast()
-    }
+    let args = match args.iter().position(|it| trim_to.bytes().contains(it)) {
+        Some(ix) => &args[..ix],
+        None => args,
+    };
+    new_with_allowlist(args, valid_keys)
+}
 
-    unsafe extern "C" fn rte_kvargs_free(kvlist: *mut rte_kvargs) {
-        drop(maybe::seabox(kvlist as *mut KVargs))
-    }
+assert_abi!(fn bindings::rte_kvargs_free = rte_kvargs_free as unsafe extern "C" fn(_));
+#[no_mangle]
+extern "C" fn rte_kvargs_free(_: Option<SeaBox<KVargs>>) {} // dropped
 
-    unsafe extern "C" fn rte_kvargs_get(
-        kvlist: *const rte_kvargs,
-        key: *const c_char,
-    ) -> *const c_char {
-        if let Some(kvlist) = kvlist.cast::<KVargs>().as_ref() {
-            if let Some(needle) = maybe::c_str(key) {
-                if let Some((_, Some(found))) = kvlist.iter().find(|(k, _)| k.as_cstr() == needle) {
-                    return found.as_ptr();
-                }
+assert_abi!(fn bindings::rte_kvargs_get = rte_kvargs_get as unsafe extern "C" fn(_, _) -> _);
+#[no_mangle]
+extern "C" fn rte_kvargs_get<'a>(
+    kvlist: Option<&'a KVargs>,
+    key: Option<&SeaStr>,
+) -> Option<&'a SeaStr> {
+    let needle = key?;
+    kvlist?
+        .iter()
+        .find_map(|(haystack, val)| match haystack == needle {
+            true => val,
+            false => None,
+        })
+}
+
+assert_abi!(fn bindings::rte_kvargs_get_with_value = rte_kvargs_get_with_value as unsafe extern "C" fn(_, _, _) -> _);
+#[no_mangle]
+extern "C" fn rte_kvargs_get_with_value<'a>(
+    kvlist: Option<&'a KVargs>,
+    key: Option<&SeaStr>,
+    value: Option<&SeaStr>,
+) -> Option<&'a SeaStr> {
+    for (k, v) in kvlist?.iter() {
+        if let Some(needle) = key {
+            if k != needle {
+                continue;
             }
         }
-        ptr::null()
-    }
-
-    unsafe extern "C" fn rte_kvargs_get_with_value(
-        kvlist: *const rte_kvargs,
-        key: *const c_char,
-        value: *const c_char,
-    ) -> *const c_char {
-        if let Some(kvlist) = kvlist.cast::<KVargs>().as_ref() {
-            let key = maybe::c_str(key);
-            let value = maybe::c_str(value);
-            for (k, v) in kvlist.iter() {
-                if let Some(key) = key {
-                    if key != k.as_cstr() {
-                        continue;
-                    }
-                }
-                if let (Some(value), Some(v)) = (value, v) {
-                    if value != v.as_cstr() {
-                        continue;
-                    }
-                }
-                if let Some(v) = v {
-                    return v.as_ptr();
-                }
+        if let (Some(needle), Some(v)) = (value, v) {
+            if needle != v {
+                continue;
             }
         }
-        ptr::null()
+        if v.is_some() {
+            return v;
+        }
     }
+    None
+}
 
-    unsafe extern "C" fn rte_kvargs_process(
-        kvlist: *const rte_kvargs,
-        key_match: *const c_char,
-        handler: arg_handler_t,
-        opaque_arg: *mut c_void,
-    ) -> c_int {
-        process(kvlist, key_match, handler, opaque_arg, false)
-    }
-
-    unsafe extern "C" fn rte_kvargs_process_opt(
-        kvlist: *const rte_kvargs,
-        key_match: *const c_char,
-        handler: arg_handler_t,
-        opaque_arg: *mut c_void,
-    ) -> c_int {
-        process(kvlist, key_match, handler, opaque_arg, true)
-    }
-
-    unsafe extern "C" fn rte_kvargs_count(
-        kvlist: *const rte_kvargs,
-        key_match: *const c_char,
-    ) -> c_uint {
-        let mut count = 0;
-        let needle = maybe::c_str(key_match);
-        if let Some(kvlist) = kvlist.cast::<KVargs>().as_ref() {
-            for (k, _) in kvlist.iter() {
-                let inc = match needle {
-                    Some(it) => it == k.as_cstr(),
-                    None => true,
-                };
-                if inc {
-                    count += 1
-                }
+assert_abi!(fn bindings::rte_kvargs_count = rte_kvargs_count as unsafe extern "C" fn(_, _) -> _);
+#[no_mangle]
+extern "C" fn rte_kvargs_count(kvlist: Option<&KVargs>, key_match: Option<&SeaStr>) -> c_uint {
+    let mut count = Saturating(0);
+    if let Some(kvlist) = kvlist {
+        for (k, _) in kvlist.iter() {
+            let inc = match key_match {
+                Some(needle) => needle == k,
+                None => true,
+            };
+            if inc {
+                count += 1
             }
         }
-        count
     }
+    count.0
+}
+
+assert_abi!(fn bindings::rte_kvargs_process = rte_kvargs_process as unsafe extern "C" fn(_, _, _, _) -> _);
+/// # Safety
+/// - `handler` must be safe to call.
+#[no_mangle]
+pub unsafe extern "C" fn rte_kvargs_process(
+    kvlist: Option<&KVargs>,
+    key_match: Option<&SeaStr>,
+    handler: arg_handler_t,
+    opaque_arg: *mut c_void,
+) -> c_int {
+    process(kvlist, key_match, handler, opaque_arg, false)
+}
+
+assert_abi!(fn bindings::rte_kvargs_process_opt = rte_kvargs_process_opt as unsafe extern "C" fn(_, _, _, _) -> _);
+/// # Safety
+/// - `handler` must be safe to call.
+#[no_mangle]
+pub unsafe extern "C" fn rte_kvargs_process_opt(
+    kvlist: Option<&KVargs>,
+    key_match: Option<&SeaStr>,
+    handler: arg_handler_t,
+    opaque_arg: *mut c_void,
+) -> c_int {
+    process(kvlist, key_match, handler, opaque_arg, true)
 }
 
 fn new_with_allowlist(
     s: &[u8],
-    allowlist: Option<nul_terminated::Iter<SeaStr>>,
+    allowlist: Option<till_null::Iter<SeaStr>>,
 ) -> Option<SeaBox<KVargs>> {
     let kvlist = SeaBox::try_new(KVargs::new(s)?).ok()?;
     if let Some(allowlist) = allowlist {
@@ -155,20 +140,21 @@ fn new_with_allowlist(
     Some(kvlist)
 }
 
+/// # Safety
+/// - Must be safe to call `handler`.
 unsafe fn process(
-    kvlist: *const rte_kvargs,
-    key_match: *const c_char,
+    kvlist: Option<&KVargs>,
+    key_match: Option<&SeaStr>,
     handler: arg_handler_t,
     opaque_arg: *mut c_void,
     allow_missing_value: bool,
 ) -> c_int {
-    let needle = maybe::c_str(key_match);
-    let (Some(kvlist), Some(cb)) = (kvlist.cast::<KVargs>().as_ref(), handler) else {
+    let (Some(kvlist), Some(cb)) = (kvlist, handler) else {
         return -1;
     };
     for (k, v) in kvlist.iter() {
-        let call = match needle {
-            Some(it) => it == k.as_cstr(),
+        let call = match key_match {
+            Some(needle) => needle == k,
             None => true,
         };
         if call {
@@ -195,62 +181,13 @@ unsafe fn process(
     0
 }
 
-macro_rules! assert_eq_layout {
-    ($(
-        // use :path instead of :ty because it is valid in pattern position
-        // (for exhaustiveness check)
-        $left_ty:path = /* can't use `==` here */ $right_ty:path {
-            $($left_field:ident = $right_field:ident),* $(,)?
-        }
-    )*) => {$(
-        const _: () = {
-            use ::core::{{alloc::Layout, mem::offset_of}, concat, stringify, assert};
-
-            // very happy with this :)
-            const fn field_layout<T, U>(_: fn(&U) -> &T) -> Layout {
-                Layout::new::<T>()
-            }
-
-            let left = Layout::new::<$left_ty>();
-            let right = Layout::new::<$right_ty>();
-
-            assert! {
-                left.size() == right.size(),
-                concat!("size mismatch between ", stringify!($left_ty), " and ", stringify!($right_ty))
-            };
-            assert! {
-                left.align() == right.align(),
-                concat!("aligment mismatch between ", stringify!($left_ty), " and ", stringify!($right_ty))
-            };
-
-            $(
-                assert! {
-                    offset_of!($left_ty, $left_field) == offset_of!($right_ty, $right_field),
-                    concat!("mismatched offsets between ", stringify!($left_field), " and ", stringify!($right_field))
-                };
-
-                let left = field_layout(|it: &$left_ty| &it.$left_field);
-                let right = field_layout(|it: &$right_ty| &it.$right_field);
-
-                assert! {
-                    left.size() == right.size(),
-                    concat!("size mismatch between ", stringify!($left_field), " and ", stringify!($right_field))
-                };
-                assert! {
-                    left.align() == right.align(),
-                    concat!("aligment mismatch between ", stringify!($left_field), " and ", stringify!($right_field))
-                };
-            )*
-
-
-            fn exhaustive($left_ty { $($left_field: _),* }: $left_ty, $right_ty { $($right_field: _),* }: $right_ty) {}
-        };
-    )*};
+assert_abi! {
+    struct KVargs = bindings::rte_kvargs { buf = str_, count = count, pairs = pairs };
+    struct Pair = bindings::rte_kvargs_pair { key = key, value = value };
 }
 
-/// ABI-compatible with [`rte_kvargs`].
 #[repr(C)]
-struct KVargs {
+pub struct KVargs {
     /// Concatenated nul-terminated buffers for [`Self::pairs`].
     buf: Option<SeaString>,
     count: c_uint,
@@ -259,23 +196,10 @@ struct KVargs {
     pairs: [MaybeUninit<Pair>; 32],
 }
 
-/// ABI-compatible with [`rte_kvargs_pair`].
 #[repr(C)]
 struct Pair {
     key: NonNull<SeaStr>,
     value: Option<NonNull<SeaStr>>,
-}
-
-assert_eq_layout! {
-    KVargs = rte_kvargs {
-        buf = str_,
-        count = count,
-        pairs = pairs,
-    }
-    Pair = rte_kvargs_pair {
-        key = key,
-        value = value,
-    }
 }
 
 impl KVargs {
@@ -395,34 +319,6 @@ fn bare<'a>(input: &'a [u8]) -> ParseResult<'a> {
         },
         |it: &[u8]| !it.is_empty(),
     )(input)
-}
-
-mod maybe {
-    use std::{
-        ffi::{c_char, CStr},
-        ptr::NonNull,
-    };
-
-    use rust3p::seasick::{nul_terminated::Iter, SeaBox};
-
-    pub unsafe fn c_str<'a>(ptr: *const c_char) -> Option<&'a CStr> {
-        match ptr.is_null() {
-            true => None,
-            false => Some(CStr::from_ptr(ptr)),
-        }
-    }
-    pub unsafe fn iter<'a, T>(base: *const *const T) -> Option<Iter<'a, T>> {
-        match NonNull::new(base.cast_mut()) {
-            Some(base) => Some(Iter::new(base)),
-            None => None,
-        }
-    }
-    pub unsafe fn seabox<T>(ptr: *mut T) -> Option<SeaBox<T>> {
-        match ptr.is_null() {
-            true => None,
-            false => Some(SeaBox::from_raw(ptr)),
-        }
-    }
 }
 
 #[test]
