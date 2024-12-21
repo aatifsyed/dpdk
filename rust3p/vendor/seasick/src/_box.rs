@@ -23,6 +23,7 @@ pub type SeaBox<T> = SeaBoxIn<T, crate::_alloc::Libc>;
 /// The allocator is pluggable - see [`Allocator`].
 ///
 /// `#[repr(transparent)]` such that `Option<SeaBox<T>>` has the same layout as `*mut T`.
+#[repr(transparent)]
 pub struct SeaBoxIn<T, A: Allocator> {
     ptr: NonNull<T>,
     own: PhantomData<T>,

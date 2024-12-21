@@ -107,9 +107,9 @@ dependencies = [
 
 [[package]]
 name = "seasick"
-version = "0.2.0"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cb16b605e2bd62d1de8214b2a70b26fec89619fbaad55fd00659f1dd98ccaf6"
+checksum = "8391ac97ae36d3bc2be41444c9b83b54b8d8c947d05b32fccca637887dda7378"
 dependencies = [
  "libc",
 ]

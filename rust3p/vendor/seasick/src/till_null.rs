@@ -21,7 +21,7 @@
 //! }
 //!
 //! #[no_mangle]
-//! extern "C" fn count(arr: Option<nul_terminated::Iter<SeaStr>>) -> c_uint {
+//! extern "C" fn count(arr: Option<till_null::Iter<SeaStr>>) -> c_uint {
 //!     arr.unwrap_or_default().count() as _
 //! }
 //!
